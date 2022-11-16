@@ -1,0 +1,52 @@
+name: PubSub Emulator - PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "apps/pubsub-emulator/**"
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    env:
+      CLOUDSDK_PYTHON: python3
+      CLOUDSDK_PYTHON_SITEPACKAGES: 1
+      REPO_PROJECT: inshur-prod0-repo0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Versions
+        run: |
+          cd $GITHUB_WORKSPACE
+          python --version
+          gcloud version
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: Configure GCP Service Account
+        run: |
+          GOOGLE_APPLICATION_CREDENTIALS="${PWD}/service_account_key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}" >> $GITHUB_ENV
+          echo ${{ secrets.GCP_SERVICE_ACCOUNT_REPO0 }} | base64 -d > service_account_key.json
+          gcloud --quiet auth activate-service-account --key-file service_account_key.json
+
+
+
+          gcloud config list
+
+          gcloud config set project $REPO_PROJECT
+
+          gcloud artifacts print-settings npm --project=$REPO_PROJECT \
+          --repository=npm --location=europe --scope=@inshur --json-key=service_account_key.json > .npmrc
+      
+      - name: Docker - Build Image and Test
+        run: |
+          cp service_account_key.json apps/pubsub-emulator/service_account_key.json
+          cd apps/pubsub-emulator && make ci

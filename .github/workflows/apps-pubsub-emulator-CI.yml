@@ -1,0 +1,72 @@
+name: PubSub Emulator - CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/pubsub-emulator/**"
+
+jobs:
+  Dockerize:
+    runs-on: ubuntu-20.04
+    permissions: write-all
+    env:
+      CLOUDSDK_PYTHON: python3
+      CLOUDSDK_PYTHON_SITEPACKAGES: 1
+      REPO_PROJECT: inshur-dev0-service0
+      IMAGE: pubsub-emulator
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Versions
+        run: |
+          cd $GITHUB_WORKSPACE
+          python --version
+          gcloud version
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: Configure GCP Service Account
+        run: |
+          GOOGLE_APPLICATION_CREDENTIALS="${PWD}/service_account_key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}" >> $GITHUB_ENV
+          echo ${{ secrets.GCP_SERVICE_ACCOUNT_REPO0 }} | base64 -d > service_account_key.json
+          gcloud --quiet auth activate-service-account --key-file service_account_key.json
+
+          gcloud config list
+          gcloud config set project $REPO_PROJECT
+          
+          gcloud artifacts print-settings npm --project=$REPO_PROJECT \
+           --repository=npm --location=europe --scope=@inshur --json-key=service_account_key.json > .npmrc
+          gcloud --quiet auth configure-docker
+
+      - name: Set outputs
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+      - name: Define branch tag
+        run: |
+          echo "Running on main"
+          BRANCH_TAG_VERSION=${{ steps.vars.outputs.sha_short }}
+          echo "Docker image version will be $BRANCH_TAG_VERSION"
+          echo '::echo::on'
+          echo "::set-output name=branch_tag_version::$(echo ${BRANCH_TAG_VERSION})"
+          echo '::echo::off'
+        id: docker-build
+
+      - name: Build in Docker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp service_account_key.json apps/inshur-test-orchestrator/service_account_key.json
+          cd apps/pubsub-emulator && make ci image=gcr.io/$REPO_PROJECT/$IMAGE tag=${{ steps.docker-build.outputs.branch_tag_version }}
+
+      - name: Push Image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cd apps/pubsub-emulator && make push image=gcr.io/$REPO_PROJECT/$IMAGE tag=${{ steps.docker-build.outputs.branch_tag_version }}
+          

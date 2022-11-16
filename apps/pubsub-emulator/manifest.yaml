@@ -1,0 +1,12 @@
+image: gcr.io/inshur-prod0-repo0/pubsub-emulator:latest
+manifests:
+  -
+    image: gcr.io/inshur-prod0-repo0/pubsub-emulator:arm64
+    platform:
+      architecture: arm64
+      os: linux
+  -
+    image: gcr.io/inshur-prod0-repo0/pubsub-emulator:amd64
+    platform:
+      architecture: amd64
+      os: linux

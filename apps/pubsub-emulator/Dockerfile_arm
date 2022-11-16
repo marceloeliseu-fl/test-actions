@@ -1,0 +1,37 @@
+FROM golang:alpine as builder
+
+RUN apk update && apk upgrade && apk add --no-cache curl git
+
+RUN curl -s https://raw.githubusercontent.com/eficode/wait-for/master/wait-for -o /usr/bin/wait-for
+RUN chmod +x /usr/bin/wait-for
+
+RUN mkdir /tmp/pubsub-emulator
+
+COPY main.go /tmp/pubsub-emulator/main.go
+
+WORKDIR /tmp/pubsub-emulator
+
+RUN go mod init gcloud-pubsub-emulator
+RUN go get gcloud-pubsub-emulator
+RUN GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o gcloud-pubsub-emulator
+
+###############################################################################
+
+FROM arm64v8/python:alpine
+
+WORKDIR /tmp
+RUN wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-409.0.0-darwin-arm.tar.gz
+RUN tar -xf google-cloud-cli-409.0.0-darwin-arm.tar.gz
+ENV PATH=/tmp/google-cloud-sdk/bin:$PATH
+
+RUN apk --update add openjdk8-jre netcat-openbsd && gcloud components install beta pubsub-emulator
+
+COPY --from=builder /usr/bin/wait-for /usr/bin/
+COPY --from=builder /tmp/pubsub-emulator/gcloud-pubsub-emulator /usr/bin/gcloud-pubsub-emulator
+
+COPY run.sh /run.sh
+RUN chmod +x /run.sh
+EXPOSE 8681
+EXPOSE 8682
+
+CMD /run.sh
