@@ -1,4 +1,4 @@
-name: PubSub Emulator - PR
+name: PubSub Emulator - PR test
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ jobs:
     env:
       CLOUDSDK_PYTHON: python3
       CLOUDSDK_PYTHON_SITEPACKAGES: 1
-      REPO_PROJECT: inshur-prod0-repo0
+      REPO_PROJECT: inshur-dev0-service0
 
     steps:
       - name: Checkout
